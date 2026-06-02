@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Para você ❤️</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    background: radial-gradient(circle at 50% 40%, #2a0a12 0%, #14060a 55%, #05030a 100%);
+    overflow: hidden;
+    font-family: "Georgia", "Times New Roman", serif;
+  }
+  #heart {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .message {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 8%;
+    text-align: center;
+    color: #ffd6e0;
+    z-index: 2;
+    pointer-events: none;
+    padding: 0 20px;
+    text-shadow: 0 0 18px rgba(255, 60, 110, 0.7);
+    opacity: 0;
+    animation: fadeUp 2.5s ease forwards;
+    animation-delay: 2s;
+  }
+  .message h1 {
+    font-size: clamp(28px, 8vw, 56px);
+    font-weight: normal;
+    letter-spacing: 1px;
+  }
+  .message p {
+    margin-top: 14px;
+    font-size: clamp(15px, 4.5vw, 22px);
+    color: #ff9bb3;
+    font-style: italic;
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(25px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
+</head>
+<body>
+  <canvas id="heart"></canvas>
+  <div class="message">
+    <h1>Eu te amo ❤️</h1>
+    <p>de longe ou de perto, você é a minha vida</p>
+  </div>
+
+<script>
+const canvas = document.getElementById("heart");
+const ctx = canvas.getContext("2d");
+let W, H, cx, cy, scale;
+
+function resize() {
+  W = canvas.width = window.innerWidth * devicePixelRatio;
+  H = canvas.height = window.innerHeight * devicePixelRatio;
+  canvas.style.width = window.innerWidth + "px";
+  canvas.style.height = window.innerHeight + "px";
+  cx = W / 2;
+  cy = H / 2.25;
+  scale = Math.min(W, H) / 32;
+}
+resize();
+window.addEventListener("resize", resize);
+
+// Parametric heart curve -> target points
+function heartPoint(t) {
+  const x = 16 * Math.pow(Math.sin(t), 3);
+  const y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+  return { x, y };
+}
+
+// Build target points: outline + filled interior
+function buildTargets() {
+  const pts = [];
+  const steps = 220;
+  for (let i = 0; i < steps; i++) {
+    const t = (i / steps) * Math.PI * 2;
+    const p = heartPoint(t);
+    pts.push(p);
+    // interior points by scaling toward center
+    const r1 = 0.85 - Math.random() * 0.7;
+    pts.push({ x: p.x * r1, y: p.y * r1 });
+    const r2 = 0.5 - Math.random() * 0.45;
+    pts.push({ x: p.x * r2, y: p.y * r2 });
+  }
+  return pts;
+}
+
+class Particle {
+  constructor(target) {
+    this.target = target;
+    this.x = (Math.random() - 0.5) * W;
+    this.y = (Math.random() - 0.5) * H;
+    this.vx = 0;
+    this.vy = 0;
+    this.size = 1 + Math.random() * 2;
+    const hue = 340 + Math.random() * 25;
+    this.color = `hsl(${hue}, 90%, ${55 + Math.random() * 20}%)`;
+  }
+  update(beat) {
+    const tx = cx + this.target.x * scale * beat;
+    const ty = cy + this.target.y * scale * beat;
+    const dx = tx - this.x;
+    const dy = ty - this.y;
+    this.vx = (this.vx + dx * 0.012) * 0.82;
+    this.vy = (this.vy + dy * 0.012) * 0.82;
+    this.x += this.vx;
+    this.y += this.vy;
+  }
+  draw() {
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size * devicePixelRatio, 0, Math.PI * 2);
+    ctx.fillStyle = this.color;
+    ctx.fill();
+  }
+}
+
+let particles = [];
+function init() {
+  const targets = buildTargets();
+  particles = targets.map(t => new Particle(t));
+}
+init();
+window.addEventListener("resize", init);
+
+// floating little hearts rising
+const floaters = [];
+function spawnFloater() {
+  floaters.push({
+    x: Math.random() * W,
+    y: H + 20,
+    s: (6 + Math.random() * 14) * devicePixelRatio,
+    sp: (0.4 + Math.random() * 0.9) * devicePixelRatio,
+    a: 0.15 + Math.random() * 0.35,
+    drift: (Math.random() - 0.5) * 0.6,
+  });
+}
+function drawMiniHeart(x, y, s, a) {
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.fillStyle = "#ff4d7d";
+  ctx.beginPath();
+  for (let i = 0; i <= 30; i++) {
+    const t = (i / 30) * Math.PI * 2;
+    const p = heartPoint(t);
+    const px = x + p.x * (s / 32);
+    const py = y + p.y * (s / 32);
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+let frame = 0;
+function animate() {
+  frame++;
+  // trail effect
+  ctx.fillStyle = "rgba(8, 4, 10, 0.25)";
+  ctx.fillRect(0, 0, W, H);
+
+  // heartbeat: double-thump pulse
+  const cycle = (frame % 90) / 90;
+  let beat = 1;
+  if (cycle < 0.12) beat = 1 + Math.sin(cycle / 0.12 * Math.PI) * 0.10;
+  else if (cycle < 0.28) beat = 1 + Math.sin((cycle - 0.16) / 0.12 * Math.PI) * 0.06;
+  beat += 0.02 * Math.sin(frame * 0.05);
+
+  // glow
+  ctx.shadowBlur = 18 * devicePixelRatio;
+  ctx.shadowColor = "rgba(255, 40, 90, 0.9)";
+
+  for (const p of particles) { p.update(beat); p.draw(); }
+
+  ctx.shadowBlur = 0;
+  if (frame % 18 === 0) spawnFloater();
+  for (let i = floaters.length - 1; i >= 0; i--) {
+    const f = floaters[i];
+    f.y -= f.sp;
+    f.x += f.drift;
+    drawMiniHeart(f.x, f.y, f.s, f.a);
+    if (f.y < -30) floaters.splice(i, 1);
+  }
+
+  requestAnimationFrame(animate);
+}
+animate();
+</script>
+</body>
+</html>
